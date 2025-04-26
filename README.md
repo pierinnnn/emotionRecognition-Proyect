@@ -1,1 +1,1 @@
-﻿# emotionRecognition-Proyect
+﻿# emotionRecognition-Project
