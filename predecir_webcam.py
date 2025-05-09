@@ -2,8 +2,13 @@ import cv2
 import numpy as np
 from tensorflow.keras.models import load_model
 import tensorflow as tf
+
+import matplotlib.pyplot as plt
+from io import BytesIO
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
 
 model = load_model('modelo_emociones.h5')
 
@@ -45,7 +50,7 @@ while True:
         max_index = np.argmax(prediction[0])
         emotion = class_labels[max_index]
 
-        # Actualizar contador
+
         emotion_counts[emotion] += 1
 
         cv2.putText(frame, emotion, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
@@ -60,17 +65,63 @@ cv2.destroyAllWindows()
 
 
 def guardar_reporte_pdf(emotion_counts, filename="reporte_emociones.pdf"):
-    c = canvas.Canvas(filename, pagesize=letter)
-    width, height = letter
-    text = c.beginText(40, height - 40)
-    text.setFont("Helvetica", 12)
-    text.textLine("Reporte de emociones detectadas")
-    text.textLine("")
-    for emotion, count in emotion_counts.items():
-        text.textLine(f"{emotion}: {count} detecciones")
-    c.drawText(text)
-    c.save()
-    print(f"Reporte guardado en {filename}")
 
+    doc = SimpleDocTemplate(filename, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+
+    titulo = Paragraph("<b>Reporte de emociones detectadas</b>", styles['Title'])
+    story.append(titulo)
+    story.append(Spacer(1, 12))
+
+
+    intro = Paragraph("Este reporte muestra un resumen de las emociones detectadas durante la ejecución del programa.",
+                      styles['BodyText'])
+    story.append(intro)
+    story.append(Spacer(1, 12))
+
+
+    data = [["Emoción", "Detecciones"]]
+    for emotion, count in emotion_counts.items():
+        data.append([emotion, str(count)])
+
+    t = Table(data)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 24))
+
+
+    labels = list(emotion_counts.keys())
+    sizes = list(emotion_counts.values())
+    colors_pie = ['#FF9999', '#66B2FF', '#99FF99', '#66B2FF', '#99FF99', '#66B2FF', '#99FF99']
+    plt.figure(figsize=(6, 4))
+    plt.pie(sizes, labels=labels, colors=colors_pie, autopct='%1.1f%%', startangle=90)
+    plt.axis('equal')
+    plt.title('Distribución de emociones detectadas')
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=100)
+    plt.close()
+    buf.seek(0)
+    pie_chart = Image(buf, width=400, height=300)
+    story.append(pie_chart)
+    story.append(Spacer(1, 12))
+
+
+    footer = Paragraph("<i>Reporte generado automáticamente por tu sistema de detección de emociones</i>",
+                       styles['Italic'])
+    story.append(footer)
+
+    doc.build(story)
+    print(f"Reporte guardado en {filename}")
 
 guardar_reporte_pdf(emotion_counts)
